@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Firecracker Factory — Super Forecast Dashboard</title>
+
+<!-- Fonts & Icons -->
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;500;700;900&display=swap" rel="stylesheet">
+
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+  :root{
+    --bg-1: #1b1348;
+    --bg-2: #5b1d8a;
+    --glass: rgba(255,255,255,0.08);
+    --glass-2: rgba(255,255,255,0.06);
+    --accent: #00ff88;
+    --danger: #ff4d4f;
+    --safe: #2fe08a;
+    --muted: rgba(255,255,255,0.75);
+    --card-radius: 16px;
+    --max-width: 1100px;
+  }
+
+  html,body{
+    height:100%;
+    margin:0;
+    font-family:'Poppins',sans-serif;
+    background: radial-gradient(1200px 600px at 10% 10%, rgba(255,255,255,0.03), transparent),
+                linear-gradient(135deg,var(--bg-1),var(--bg-2));
+    color:white;
+    -webkit-font-smoothing:antialiased;
+    -moz-osx-font-smoothing:grayscale;
+  }
+
+  .wrap{
+    max-width: var(--max-width);
+    margin: 32px auto;
+    padding: 28px;
+    display: grid;
+    grid-template-columns: 420px 1fr 360px;
+    gap: 20px;
+    align-items:start;
+  }
+
+  /* Left column (input + weather card) */
+  .left-card{
+    background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02));
+    border-radius: var(--card-radius);
+    padding: 20px;
+    box-shadow: 0 12px 30px rgba(0,0,0,0.4);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .brand {
+    display:flex;
+    gap:12px;
+    align-items:center;
+    margin-bottom:14px;
+  }
+  .logo {
+    width:48px;height:48px;border-radius:10px;background:linear-gradient(135deg,#ffb86b,#ff6b6b);
+    display:flex;align-items:center;justify-content:center;font-weight:900;color:#2b0b05;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.3);
+  }
+  h1{font-size:20px;margin:0}
+  p.small{font-size:13px;color:var(--muted);margin:6px 0 18px}
+
+  label{font-weight:600;font-size:13px;color:#fff;margin-bottom:8px;display:block}
+
+  input[type="text"]{
+    width:100%;
+    padding:12px 14px;
+    font-size:15px;border-radius:10px;border:none;outline:none;
+    background: rgba(255,255,255,0.95); color:#0b0b0b;
+  }
+
+  .btn{
+    margin-top:12px;
+    width:100%;
+    padding:12px;
+    border-radius:10px;border:none;cursor:pointer;font-weight:800;
+    background: linear-gradient(90deg,#00ff88,#00c86b); color:#04321d; font-size:16px;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.35);
+    transition: transform .18s ease, box-shadow .18s;
+  }
+  .btn:hover{ transform: translateY(-3px); box-shadow: 0 18px 30px rgba(0,0,0,0.45); }
+
+  /* Middle column (main result + graphs) */
+  .main-card{
+    background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.02));
+    border-radius: var(--card-radius);
+    padding:22px; box-shadow: 0 12px 30px rgba(0,0,0,0.35);
+  }
+
+  .top-row{display:flex;align-items:center;gap:14px; justify-content:space-between}
+  .weather-visual{
+    display:flex;gap:14px;align-items:center;
+  }
+  .weather-icon {
+    width:110px;height:110px;border-radius:16px;background:linear-gradient(120deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02));
+    display:flex;align-items:center;justify-content:center;font-size:36px;
+    position:relative;overflow:hidden;
+  }
+  /* a cute sun/cloud icon (SVG style via CSS) */
+  .sun { position:absolute; width:64px;height:64px; right:8px; top:8px; z-index:2; animation: floaty 6s ease-in-out infinite;}
+  .cloud { position:absolute; left:8px; bottom:6px; z-index:2; animation: bob 4s ease-in-out infinite;}
+
+  @keyframes floaty { 0%,100%{ transform: translateY(0);} 50%{ transform: translateY(-6px);} }
+  @keyframes bob { 0%,100%{ transform: translateY(0);} 50%{ transform: translateY(-4px);} }
+
+  .temp-large { font-size:42px; font-weight:900; letter-spacing: -1px }
+  .meta { font-size:14px;color:var(--muted) }
+
+  /* result card color changes */
+  .status-safe { border-left:6px solid var(--safe); }
+  .status-warn { border-left:6px solid #ffd166; }
+  .status-danger { border-left:6px solid var(--danger); }
+
+  /* right column (gauge + thermometer) */
+  .side{
+    background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.02));
+    border-radius: var(--card-radius);
+    padding:18px;
+    box-shadow: 0 12px 30px rgba(0,0,0,0.35);
+    display:flex;flex-direction:column;gap:14px;
+    align-items:center;
+  }
+
+  /* Gauge */
+  .gauge-wrap{ width:260px; height:180px; display:flex; align-items:center; justify-content:center; position:relative;}
+  svg.gauge { width:100%; height:100%; overflow:visible }
+  .gauge .needle{ transform-origin: 50% 70%; transition: transform .6s cubic-bezier(.2,.9,.2,1); }
+  .gauge-label{ position:absolute; bottom:10px; font-weight:800; text-align:center; font-size:14px; color:var(--muted) }
+
+  /* thermometer */
+  .therm {
+    width:60px; height:220px; background:rgba(255,255,255,0.04); border-radius:18px; padding:10px;
+    display:flex;align-items:flex-end; justify-content:center; position:relative; overflow:hidden;
+  }
+  .therm .mercury{
+    width:24px; background: linear-gradient(#ff7a7a,#ff3b3b); border-radius:12px 12px 6px 6px;
+    transition: height .8s cubic-bezier(.2,.9,.2,1);
+  }
+  .therm .bulb{ position:absolute; bottom:-18px; width:44px; height:44px; border-radius:50%; background: linear-gradient(#ff7a7a,#ff3b3b); box-shadow: 0 6px 18px rgba(0,0,0,0.35); }
+
+  /* small cards */
+  .row-cards{ display:flex; gap:10px; margin-top:14px; }
+  .small-card{ background: rgba(255,255,255,0.06); padding:10px 12px; border-radius:10px; min-width:120px; text-align:center;}
+  .small-card h4{ margin:0; font-size:18px }
+  .small-card p{ margin:6px 0 0; color:var(--muted); font-size:13px }
+
+  /* table */
+  table{ width:100%; border-collapse:collapse; margin-top:12px }
+  td,th{ padding:8px; text-align:left; font-size:13px }
+  th{ color:var(--muted); font-weight:600; font-size:12px }
+
+  /* output JSON area */
+  .output-area { margin-top:12px; background: rgba(255,255,255,0.04); padding:12px; border-radius:10px; font-family:monospace; font-size:13px; color:#fff; overflow:auto; max-height:200px; }
+
+  /* alert banner */
+  .alert {
+    width:100%; padding:12px 14px; border-radius:12px; font-weight:800; display:flex; gap:12px; align-items:center;
+    justify-content:center; box-shadow: 0 10px 30px rgba(0,0,0,0.4); margin-bottom:10px;
+  }
+  .alert.danger { background: linear-gradient(90deg, rgba(255,77,79,0.2), rgba(255,77,79,0.12)); border:1px solid rgba(255,77,79,0.25); color: #ffdede; animation: pulse 1.6s infinite; }
+  @keyframes pulse { 0%{ transform: translateY(0); } 50%{ transform: translateY(-4px); } 100%{ transform: translateY(0); } }
+  .alert.safe { background: linear-gradient(90deg, rgba(47,224,138,0.12), rgba(47,224,138,0.06)); border:1px solid rgba(47,224,138,0.12); color:#eafff3 }
+
+  /* responsive */
+  @media(max-width:1100px){
+    .wrap{ grid-template-columns: 1fr; padding:18px; gap:14px; }
+    .side{ order:3 }
+  }
+
+  footer{ text-align:center; color:var(--muted); margin:18px auto; font-size:13px }
+</style>
+</head>
+
+<body>
+<div class="wrap">
+
+  <!-- LEFT: input + quick details -->
+  <div class="left-card">
+    <div class="brand">
+      <div class="logo">FC</div>
+      <div>
+        <h1>Firecracker Factory</h1>
+        <p class="small">AI Temperature Forecasting • Safety Alerts</p>
+      </div>
+    </div>
+
+    <label>Enter last 4 temperature readings (°C) — comma separated</label>
+    <input id="temps" type="text" placeholder="Example: 22.0,22.3,22.6,22.9" value="22,22.3,22.6,22.9" />
+
+    <button class="btn" onclick="predict()">Predict & Visualize</button>
+
+    <div id="alertBox" style="margin-top:12px;"></div>
+
+    <div class="row-cards">
+      <div class="small-card">
+        <h4 id="predC">-- °C</h4>
+        <p>Predicted (C)</p>
+      </div>
+      <div class="small-card">
+        <h4 id="predF">-- °F</h4>
+        <p>Predicted (F)</p>
+      </div>
+    </div>
+
+    <div style="margin-top:12px">
+      <h4 style="margin:8px 0 6px">Inputs (decoded)</h4>
+      <table id="inputsTable">
+        <thead><tr><th>#</th><th>Temp (°C)</th></tr></thead>
+        <tbody><tr><td colspan="2" style="color:var(--muted)">No inputs</td></tr></tbody>
+      </table>
+    </div>
+
+    <div style="margin-top:12px">
+      <h4 style="margin:8px 0 6px">Model output (raw)</h4>
+      <div class="output-area" id="outputRaw">No prediction yet</div>
+    </div>
+  </div>
+
+
+  <!-- MIDDLE: main result + charts -->
+  <div class="main-card" id="mainCard">
+    <div class="top-row">
+      <div class="weather-visual">
+        <div class="weather-icon" id="weatherIcon">
+          <!-- simple inline SVG icons -->
+          <svg class="sun" viewBox="0 0 64 64" width="64" height="64" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <defs><linearGradient id="g1" x1="0" x2="1"><stop offset="0" stop-color="#ffd166"/><stop offset="1" stop-color="#ff9100"/></linearGradient></defs>
+            <circle cx="44" cy="20" r="12" fill="url(#g1)"></circle>
+          </svg>
+          <svg class="cloud" viewBox="0 0 64 64" width="80" height="44" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M20 40a9 9 0 0 1 0-18 12 12 0 0 1 23-4 10 10 0 1 1 3 20H20z" fill="#fff" opacity="0.95"/>
+          </svg>
+        </div>
+
+        <div style="display:flex;flex-direction:column;justify-content:center;">
+          <div style="display:flex;gap:12px;align-items:center">
+            <div class="temp-large" id="bigTemp">-- °C</div>
+            <div style="text-align:left">
+              <div class="meta" id="locText">Factory Site</div>
+              <div class="meta" id="timeText">--</div>
+            </div>
+          </div>
+          <div class="meta" style="margin-top:8px" id="condText">Condition: --</div>
+        </div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:12px">
+        <div id="safetyMsg" class="small-card" style="min-width:220px; text-align:left">
+          <h4 id="safetyTitle">Status</h4>
+          <p id="safetyDesc" style="color:var(--muted)">No data</p>
+        </div>
+
+        <div style="display:flex;gap:8px">
+          <div class="small-card"><h4 id="windVal">--</h4><p>Wind</p></div>
+          <div class="small-card"><h4 id="humVal">--</h4><p>Humidity</p></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- chart area -->
+    <div style="margin-top:16px; display:grid; grid-template-columns: 1fr 280px; gap:16px;">
+      <div style="background:rgba(255,255,255,0.03); border-radius:12px; padding:12px;">
+        <h4 style="margin:6px 0 8px">Trend (last 4 readings → predicted)</h4>
+        <canvas id="trendChart" height="180"></canvas>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:12px;">
+        <div style="background:rgba(255,255,255,0.03); padding:10px;border-radius:12px;">
+          <h4 style="margin:6px 0 8px">Sparkline</h4>
+          <canvas id="spark" height="80"></canvas>
+        </div>
+
+        <div style="background:rgba(255,255,255,0.03); padding:10px;border-radius:12px;">
+          <h4 style="margin:6px 0 8px">Threshold</h4>
+          <p style="margin:6px 0; color:var(--muted)">Alert if predicted ≥ <strong>26.67°C (80°F)</strong></p>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:12px;margin-top:12px; align-items:flex-start">
+      <div class="output-area" style="flex:1" id="explainArea">
+        Explanations & recommended actions will appear here after prediction.
+      </div>
+      <div style="width:220px;">
+        <div style="font-size:13px;color:var(--muted); margin-bottom:6px">Quick Controls</div>
+        <button style="width:100%; padding:10px; border-radius:10px; border:none; background:#ffd166; font-weight:700; color:#381800; cursor:pointer" onclick="simulateHot()">Simulate Hot</button>
+        <button style="width:100%; padding:10px; border-radius:10px; border:none; background:#9ad0ff; margin-top:8px; color:#063449; font-weight:700; cursor:pointer" onclick="simulateCool()">Simulate Cool</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT: gauge + thermometer -->
+  <div class="side">
+    <div id="gaugeCard" class="gauge-wrap">
+      <!-- SVG gauge -->
+      <svg class="gauge" viewBox="0 0 300 180">
+        <!-- outer arc (color zones) -->
+        <defs>
+          <linearGradient id="gZone" x1="0" x2="1">
+            <stop offset="0%" stop-color="#2fe08a"/>
+            <stop offset="50%" stop-color="#ffd166"/>
+            <stop offset="100%" stop-color="#ff4d4f"/>
+          </linearGradient>
+        </defs>
+
+        <g transform="translate(150,140)">
+          <!-- background arc -->
+          <path d="M -120 0 A 120 120 0 0 1 120 0" stroke="#222" stroke-width="18" fill="none" opacity="0.25" />
+          <!-- colored arc -->
+          <path d="M -120 0 A 120 120 0 0 1 120 0" stroke="url(#gZone)" stroke-width="18" fill="none" stroke-linecap="round" opacity="0.98" />
+          <!-- ticks -->
+          <g id="ticks"></g>
+
+          <!-- needle (rotate this) -->
+          <g class="needle" id="needle" transform="rotate(-40)">
+            <line x1="0" y1="0" x2="0" y2="-80" stroke="#0b0b0b" stroke-width="6" stroke-linecap="round" />
+            <circle cx="0" cy="0" r="10" fill="#0b0b0b" />
+          </g>
+
+        </g>
+      </svg>
+      <div class="gauge-label" id="gaugeLabel">-- °C</div>
+    </div>
+
+    <div style="display:flex;gap:18px;align-items:center;margin-top:8px">
+      <div class="therm" title="Thermometer">
+        <div id="mercury" class="mercury" style="height:20%"></div>
+        <div class="bulb"></div>
+      </div>
+
+      <div style="flex:1">
+        <h4 style="margin:0 0 6px">Safety</h4>
+        <p id="safetyShort" style="color:var(--muted); margin:0">No data</p>
+        <div style="margin-top:8px; display:flex; gap:8px;">
+          <div style="flex:1" class="small-card"><h4 id="minVal">--</h4><p>Min</p></div>
+          <div style="flex:1" class="small-card"><h4 id="maxVal">--</h4><p>Max</p></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+</div>
+
+<footer>Built for demo • Firecracker Factory — Temperature Forecast</footer>
+
+<script>
+/* ---------- Utilities ---------- */
+const THRESH_C = 26.67; // threshold Celsius (80°F)
+function c2f(c){ return (c * 9/5) + 32; }
+function formatC(c){ return (Math.round(c*100)/100).toFixed(2) + ' °C'; }
+function formatF(c){ return (Math.round(c2f(c)*100)/100).toFixed(2) + ' °F'; }
+
+/* ---------- Chart setup ---------- */
+let trendChart, sparkChart;
+
+function initCharts(){
+  const tctx = document.getElementById('trendChart').getContext('2d');
+  trendChart = new Chart(tctx, {
+    type: 'line',
+    data: {
+      labels: ['t-3','t-2','t-1','t0','pred'],
+      datasets: [{
+        label: 'Temperature (°C)',
+        data: [null,null,null,null,null],
+        borderColor: '#ffb86b',
+        backgroundColor: 'rgba(255,184,107,0.06)',
+        tension: 0.32,
+        pointRadius: 6,
+        pointBackgroundColor: '#fff'
+      }]
+    },
+    options: {
+      plugins:{ legend:{ display:false } },
+      scales: { x:{ grid:{ display:false } }, y:{ beginAtZero:false } }
+    }
+  });
+
+  const sctx = document.getElementById('spark').getContext('2d');
+  sparkChart = new Chart(sctx, {
+    type: 'line',
+    data: { labels: ['1','2','3','4'], datasets:[{ data:[0,0,0,0], borderColor:'#9ad0ff', backgroundColor:'rgba(154,208,255,0.06)', tension:0.4, pointRadius:0 }]},
+    options:{ plugins:{ legend:{display:false} }, scales:{x:{display:false}, y:{display:false}}}
+  });
+}
+initCharts();
+
+/* initialize ticks for gauge */
+(function drawTicks(){
+  const ticks = document.getElementById('ticks');
+  // Celsius scale -60 to 120 mapped to -90deg..90deg
+  for(let i=-60;i<=120;i+=10){
+    let angle = ( (i - (-60)) / (180) ) * 180 - 90; // map
+    let rad = angle * Math.PI/180;
+    let x1 = Math.cos(rad) * 120, y1 = Math.sin(rad) * 120;
+    let x2 = Math.cos(rad) * 110, y2 = Math.sin(rad) * 110;
+    let tick = document.createElementNS('http://www.w3.org/2000/svg','line');
+    tick.setAttribute('x1', x1);
+    tick.setAttribute('y1', y1);
+    tick.setAttribute('x2', x2);
+    tick.setAttribute('y2', y2);
+    tick.setAttribute('stroke','#000');
+    tick.setAttribute('stroke-opacity', 0.35);
+    ticks.appendChild(tick);
+  }
+})();
+
+/* ---------- UI Updaters ---------- */
+function setPredictionUI(predC, extras = {}) {
+  // Update numbers
+  document.getElementById('predC').innerText = formatC(predC);
+  document.getElementById('predF').innerText = formatF(predC);
+  document.getElementById('bigTemp').innerText = Math.round(predC) + '°C';
+
+  // gauge rotation (map temp to [-40,40] deg). We'll map -30..60C to -90..90
+  const minT = -30, maxT = 60;
+  const clamped = Math.max(minT, Math.min(maxT, predC));
+  const angle = ((clamped - minT) / (maxT - minT)) * 180 - 90;
+  document.getElementById('needle').style.transform = `rotate(${angle}deg)`;
+  document.getElementById('gaugeLabel').innerText = Math.round(predC) + ' °C';
+
+  // thermometer height (percentage)
+  const merc = document.getElementById('mercury');
+  const pct = ((clamped - minT) / (maxT - minT)) * 100;
+  merc.style.height = pct + '%';
+
+  // small stats
+  document.getElementById('minVal').innerText = (extras.min !== undefined) ? formatC(extras.min) : '--';
+  document.getElementById('maxVal').innerText = (extras.max !== undefined) ? formatC(extras.max) : '--';
+  document.getElementById('windVal').innerText = extras.wind ? extras.wind : '--';
+  document.getElementById('humVal').innerText = extras.humidity ? (extras.humidity + '%') : '--';
+
+  // chart update
+  const base = extras.inputs || [0,0,0,0];
+  const data = [ base[0]||null, base[1]||null, base[2]||null, base[3]||null, predC ];
+  trendChart.data.datasets[0].data = data;
+  trendChart.update();
+
+  sparkChart.data.datasets[0].data = base;
+  sparkChart.update();
+
+  // explain box text
+  const explain = document.getElementById('explainArea');
+  let safe = predC < THRESH_C;
+  explain.innerHTML = `<b>Prediction:</b> ${formatC(predC)} (${formatF(predC)})<br/>
+    <b>Decision:</b> The predicted temperature is <strong style="color:${safe? '#8ef0b5':'#ffd6d6'}">${safe? 'below':'above'} the safety threshold</strong> (${THRESH_C}°C / 80°F).<br/><br/>
+    <b>Recommended action:</b> ${safe? 'Continue normal operations. Monitor sensors every hour.':'Trigger cooling systems, inspect storage & materials, and evacuate if readings keep rising.'}`;
+}
+
+/* ---------- Input table ---------- */
+function updateInputsTable(arr){
+  const tbody = document.querySelector('#inputsTable tbody');
+  tbody.innerHTML = '';
+  arr.forEach((v,i)=>{
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${i+1}</td><td>${formatC(v)}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+/* ---------- Alert UI ---------- */
+function showAlert(isDanger, text){
+  const a = document.getElementById('alertBox');
+  a.innerHTML = '';
+  const banner = document.createElement('div');
+  banner.className = 'alert ' + (isDanger? 'danger' : 'safe');
+  banner.innerHTML = (isDanger? '🔥 DANGER: High Temperature Predicted' : '✅ Safe: Temperature Within Limits') + 
+    `<span style="margin-left:12px; font-weight:600; opacity:0.9">${text}</span>`;
+  a.appendChild(banner);
+
+  // small safety card
+  document.getElementById('safetyTitle').innerText = isDanger? 'High Risk' : 'Normal';
+  document.getElementById('safetyDesc').innerText = isDanger? 'Predicted temperature above 80°F. Trigger safety protocol.' : 'Predicted temperature is safe.';
+  document.getElementById('safetyShort').innerText = isDanger? 'High — Act now' : 'Normal — No immediate action';
+}
+
+/* ---------- Fetch to backend ---------- */
+async function predict(){
+  // parse inputs
+  const raw = document.getElementById('temps').value.split(',');
+  let temps = raw.map(t => parseFloat(t.trim())).filter(x => !Number.isNaN(x));
+  if (temps.length === 0) {
+    document.getElementById('outputRaw').innerText = 'Please enter at least one valid temperature value (°C).';
+    return;
+  }
+  // heuristic: divide by 10 if large ints
+  const maxTemp = Math.max(...temps);
+  if (maxTemp > 100) temps = temps.map(t => t/10);
+
+  updateInputsTable(temps);
+
+  // timestamps (dummy)
+  const now = new Date().toISOString();
+  const timestamps = temps.map(()=>now);
+
+  // If opened via file:// show guidance
+  if (window.location.protocol === 'file:') {
+    document.getElementById('outputRaw').innerText = 'Page opened via file:// — fetch requests may be blocked. Open via http://127.0.0.1:5000/demo.html and run Flask server.';
+    return;
+  }
+
+  // call backend
+  try {
+    const res = await fetch('http://localhost:5000/predict', {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json' },
+      body: JSON.stringify({timestamps, temps})
+    });
+
+    if (!res.ok) {
+      const text = await res.text();
+      document.getElementById('outputRaw').innerText = 'Server error: ' + res.status + ' — ' + text;
+      return;
+    }
+    const json = await res.json();
+    document.getElementById('outputRaw').innerText = JSON.stringify(json, null, 2);
+
+    // assume backend returns predicted_temperature_c and alert_f80
+    const predC = json.predicted_temperature_c !== undefined ? Number(json.predicted_temperature_c) : null;
+    const alertF = json.alert_f80 !== undefined ? Boolean(json.alert_f80) : null;
+
+    // update UI
+    setPredictionUI(predC || (temps.reduce((a,b)=>a+b,0)/temps.length), { inputs: temps, min: Math.min(...temps), max: Math.max(...temps), wind: json.wind || '—', humidity: json.humidity || '—' });
+    showAlert(alertF, alertF ? `Predicted ${formatF(predC)}` : `Predicted ${formatC(predC)}`);
+
+  } catch (err) {
+    document.getElementById('outputRaw').innerText = JSON.stringify({ error: 'Network/CORS error', detail: String(err) }, null, 2);
+  }
+}
+
+/* ---------- Helpers: quick demo buttons ---------- */
+function simulateHot(){
+  document.getElementById('temps').value = '35,36,37,38';
+  predict();
+}
+function simulateCool(){
+  document.getElementById('temps').value = '18,19,18.5,19.2';
+  predict();
+}
+
+/* ---------- Initial demo data ---------- */
+setTimeout(()=> {
+  // draw initial demo state
+  const demo = [22,22.3,22.6,22.9];
+  updateInputsTable(demo);
+  setPredictionUI(22.9, { inputs: demo, min: 22, max:22.9, wind:'9 km/h', humidity: '55' });
+  showAlert(false, 'Initial demo: safe');
+  document.getElementById('outputRaw').innerText = 'Ready. Enter values and click Predict.';
+}, 300);
+
+</script>
+</body>
+</html>
