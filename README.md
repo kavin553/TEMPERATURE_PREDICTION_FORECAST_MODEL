@@ -1,4 +1,3 @@
-
 🌡️ AI Temperature Forecasting & Safety Alert System
 An AI-powered temperature forecasting system built using Python, Machine Learning, and Flask. The system predicts future temperature values based on the last 4 temperature readings (°C) and provides visual insights, safety alerts, and risk monitoring through an interactive web dashboard 📊🚨.
 
