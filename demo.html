@@ -486,58 +486,60 @@ function showAlert(isDanger, text){
 
 /* ---------- Fetch to backend ---------- */
 async function predict(){
-  // parse inputs
   const raw = document.getElementById('temps').value.split(',');
   let temps = raw.map(t => parseFloat(t.trim())).filter(x => !Number.isNaN(x));
+
   if (temps.length === 0) {
-    document.getElementById('outputRaw').innerText = 'Please enter at least one valid temperature value (°C).';
-    return;
-  }
-  // heuristic: divide by 10 if large ints
-  const maxTemp = Math.max(...temps);
-  if (maxTemp > 100) temps = temps.map(t => t/10);
-
-  updateInputsTable(temps);
-
-  // timestamps (dummy)
-  const now = new Date().toISOString();
-  const timestamps = temps.map(()=>now);
-
-  // If opened via file:// show guidance
-  if (window.location.protocol === 'file:') {
-    document.getElementById('outputRaw').innerText = 'Page opened via file:// — fetch requests may be blocked. Open via http://127.0.0.1:5000/demo.html and run Flask server.';
+    document.getElementById('outputRaw').innerText = 'Please enter valid temperature values';
     return;
   }
 
-  // call backend
+  // Generate timestamps (simple current timestamps)
+  let timestamps = temps.map((_, i) => {
+    let d = new Date();
+    d.setMinutes(d.getMinutes() - (temps.length - i));
+    return d.toISOString();
+  });
+
   try {
-    const res = await fetch('http://localhost:5000/predict', {
-      method:'POST',
-      headers:{ 'Content-Type':'application/json' },
-      body: JSON.stringify({timestamps, temps})
+    const response = await fetch("/predict", {   // ✅ FIXED HERE
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        timestamps: timestamps,
+        temps: temps
+      })
     });
 
-    if (!res.ok) {
-      const text = await res.text();
-      document.getElementById('outputRaw').innerText = 'Server error: ' + res.status + ' — ' + text;
-      return;
+    const data = await response.json();
+
+    document.getElementById('outputRaw').innerText = JSON.stringify(data, null, 2);
+
+    if (data.predicted_temperature_c !== undefined) {
+      setPredictionUI(data.predicted_temperature_c, {
+        inputs: temps,
+        min: Math.min(...temps),
+        max: Math.max(...temps),
+        wind: "5 km/h",
+        humidity: 60
+      });
+
+      updateInputsTable(temps);
+
+      if (data.alert_f80) {
+        showAlert(true, "Temperature exceeds safe limit!");
+      } else {
+        showAlert(false, "Temperature is within safe range.");
+      }
     }
-    const json = await res.json();
-    document.getElementById('outputRaw').innerText = JSON.stringify(json, null, 2);
 
-    // assume backend returns predicted_temperature_c and alert_f80
-    const predC = json.predicted_temperature_c !== undefined ? Number(json.predicted_temperature_c) : null;
-    const alertF = json.alert_f80 !== undefined ? Boolean(json.alert_f80) : null;
-
-    // update UI
-    setPredictionUI(predC || (temps.reduce((a,b)=>a+b,0)/temps.length), { inputs: temps, min: Math.min(...temps), max: Math.max(...temps), wind: json.wind || '—', humidity: json.humidity || '—' });
-    showAlert(alertF, alertF ? `Predicted ${formatF(predC)}` : `Predicted ${formatC(predC)}`);
-
-  } catch (err) {
-    document.getElementById('outputRaw').innerText = JSON.stringify({ error: 'Network/CORS error', detail: String(err) }, null, 2);
+  } catch (error) {
+    document.getElementById('outputRaw').innerText = "Error connecting to server";
+    console.error(error);
   }
 }
-
 /* ---------- Helpers: quick demo buttons ---------- */
 function simulateHot(){
   document.getElementById('temps').value = '35,36,37,38';
