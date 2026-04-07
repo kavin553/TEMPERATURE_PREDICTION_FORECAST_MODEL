@@ -8,3 +8,4 @@ xgboost
 matplotlib
 seaborn
 pytest
+gunicorn
