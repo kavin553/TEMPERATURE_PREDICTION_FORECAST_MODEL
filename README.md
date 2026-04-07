@@ -28,6 +28,7 @@
   </ul>
   <p>
     Designed for <b>industrial safety, climate monitoring, and AI learning</b> 🏭🌍🤖.
+    🔗 **Live Link--demo:** https://temperature-prediction-forecast-model-1.onrender.com
   </p>
 
   <hr>
