@@ -1,11 +1,10 @@
 
 
-  <!-- 🔝 Dashboard Image -->
+  <h1>🌡️ AI Temperature Forecasting & Safety Alert System</h1>
+  
   <div class="image-box">
     <img src="final_output_page.png" alt="AI Temperature Forecasting Dashboard">
   </div>
-
-  <h1>🌡️ AI Temperature Forecasting & Safety Alert System</h1>
 
   <p>
     An <b>AI-powered temperature forecasting system</b> built using
